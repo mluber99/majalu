@@ -1,5 +1,660 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MAJALU Tier-Memory</title><style>
-:root{--bg:#fff8e7;--ink:#27323a;--card:#fff;--accent:#4f8a5b;--accent2:#f2b84b;--shadow:0 8px 24px #0002}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(#dff3ff,#fff8e7);color:var(--ink);min-height:100vh}.app{min-height:100vh;padding:18px;background:transparent}.wrap{max-width:900px;margin:auto}header{text-align:center}h1{margin:6px 0 0;font-size:clamp(2rem,8vw,4rem);letter-spacing:.08em;color:#3c7650}.tag{margin:0 0 14px;font-weight:700}.controls,.stats{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:12px 0}button{border:0;border-radius:999px;padding:11px 17px;font-weight:800;background:white;box-shadow:var(--shadow);color:var(--ink)}button.active{background:var(--accent);color:white}.stats span{background:#ffffffc9;padding:8px 12px;border-radius:999px;font-weight:700}.board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px auto;max-width:720px}.card{aspect-ratio:1/1;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;border:0;padding:0;background:transparent;perspective:700px;box-shadow:none}.inner{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .38s}.card.flip .inner,.card.match .inner{transform:rotateY(180deg)}.face{position:absolute;inset:0;border-radius:18px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:none;box-shadow:var(--shadow);border:3px solid #fff}.back{background:linear-gradient(145deg,#4f8a5b,#6bab72);color:white;font-size:clamp(1rem,4vw,1.6rem);font-weight:900;letter-spacing:.05em}.front{background:white;transform:rotateY(180deg);flex-direction:column}.emoji{font-size:clamp(2.2rem,10vw,5rem);line-height:1}.name{font-size:clamp(.7rem,2.5vw,1rem);font-weight:800;margin-top:5px}.card.match .front{outline:4px solid #f2b84b}.win{display:none;text-align:center;background:white;padding:22px;border-radius:22px;box-shadow:var(--shadow);margin:18px auto;max-width:520px}.win.show{display:block}.win h2{font-size:2rem;margin:0 0 6px;color:#3c7650}.note{text-align:center;font-size:.85rem;opacity:.7;margin-top:20px}@media(min-width:700px){.board{gap:14px}.app{padding:28px}}@media(max-width:420px){.board{gap:7px}.face{border-radius:13px}}
-</style></head><body><main class="app"><div class="wrap"><header><h1>MAJALU</h1><p class="tag">🐾 Tier-Memory für kleine Entdecker</p></header><div class="controls" id="levels"><button data-pairs="6">Leicht · 6 Paare</button><button class="active" data-pairs="8">Mittel · 8 Paare</button><button data-pairs="12">Groß · 12 Paare</button></div><div class="stats"><span>🎯 Züge: <b id="moves">0</b></span><span>⭐ Paare: <b id="found">0</b>/<b id="total">8</b></span><span>⏱️ <b id="time">00:00</b></span><button id="restart">↻ Neu mischen</button></div><section class="board" id="board" aria-label="Memory Spielfeld"></section><section class="win" id="win"><h2>🎉 Geschafft!</h2><p id="result"></p><button id="again">Nochmal spielen</button></section><p class="note">Die Tiermotive sind Unicode-Emoji und benötigen keine externen Bilddateien.</p></div></main><script>
-const animals=[['🐶','Hund'],['🐱','Katze'],['🐰','Hase'],['🐮','Kuh'],['🐷','Schwein'],['🐴','Pferd'],['🦁','Löwe'],['🐘','Elefant'],['🦒','Giraffe'],['🦓','Zebra'],['🐧','Pinguin'],['🐵','Affe']];let pairs=8,first=null,second=null,lock=false,moves=0,found=0,start=null,timer=null;const board=document.querySelector('#board'),movesEl=document.querySelector('#moves'),foundEl=document.querySelector('#found'),totalEl=document.querySelector('#total'),timeEl=document.querySelector('#time'),win=document.querySelector('#win');function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}function tick(){if(start)timeEl.textContent=fmt(Math.floor((Date.now()-start)/1000))}function newGame(){clearInterval(timer);first=second=null;lock=false;moves=found=0;start=null;movesEl.textContent=0;foundEl.textContent=0;totalEl.textContent=pairs;timeEl.textContent='00:00';win.classList.remove('show');let deck=shuffle(animals.slice()).slice(0,pairs).flatMap((a,i)=>[{a,id:i},{a,id:i}]);shuffle(deck);board.innerHTML='';board.style.gridTemplateColumns=pairs<=6?'repeat(3,1fr)':'repeat(4,1fr)';deck.forEach(({a,id})=>{let c=document.createElement('button');c.className='card';c.dataset.id=id;c.setAttribute('aria-label','Verdeckte Memorykarte');c.innerHTML=`<span class="inner"><span class="face back">MAJALU</span><span class="face front"><span class="emoji">${a[0]}</span><span class="name">${a[1]}</span></span></span>`;c.addEventListener('click',()=>flip(c));board.appendChild(c)})}function flip(c){if(lock||c===first||c.classList.contains('match'))return;if(!start){start=Date.now();timer=setInterval(tick,500)}c.classList.add('flip');if(!first){first=c;return}second=c;moves++;movesEl.textContent=moves;lock=true;if(first.dataset.id===second.dataset.id){first.classList.add('match');second.classList.add('match');found++;foundEl.textContent=found;first=second=null;lock=false;if(found===pairs){clearInterval(timer);tick();setTimeout(()=>{document.querySelector('#result').textContent=`Du hast alle ${pairs} Paare in ${moves} Zügen und ${timeEl.textContent} gefunden.`;win.classList.add('show');win.scrollIntoView({behavior:'smooth'})},400)}}else setTimeout(()=>{first.classList.remove('flip');second.classList.remove('flip');first=second=null;lock=false},850)}document.querySelector('#levels').onclick=e=>{if(!e.target.dataset.pairs)return;pairs=+e.target.dataset.pairs;document.querySelectorAll('#levels button').forEach(b=>b.classList.toggle('active',b===e.target));newGame()};document.querySelector('#restart').onclick=newGame;document.querySelector('#again').onclick=newGame;newGame();
-</script></body></html>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>MAJALU – Tier-Memory</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --green: #4d915e;
+  --dark: #27323a;
+  --cream: #fff8e7;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--dark);
+  background:
+    linear-gradient(
+      180deg,
+      #dff4ff 0%,
+      #eff9f4 45%,
+      #fff8e8 100%
+    );
+}
+
+.app {
+  width: min(94%, 720px);
+  margin: auto;
+  padding: 38px 10px 50px;
+  text-align: center;
+}
+
+h1 {
+  color: #3f8755;
+  font-size: clamp(42px, 10vw, 64px);
+  letter-spacing: 7px;
+  margin: 5px 0 4px;
+}
+
+.subtitle {
+  font-size: clamp(19px, 5vw, 28px);
+  font-weight: 800;
+  margin-bottom: 28px;
+}
+
+.levels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.level {
+  border: 0;
+  background: white;
+  color: var(--dark);
+  border-radius: 40px;
+  padding: 16px 25px;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgba(0,0,0,.06);
+}
+
+.level.active {
+  background: var(--green);
+  color: white;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 25px;
+}
+
+.stat,
+.restart {
+  min-width: 145px;
+  padding: 13px 18px;
+  border-radius: 30px;
+  background: rgba(255,255,255,.9);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.restart {
+  border: 0;
+  color: var(--dark);
+  cursor: pointer;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin: 10px auto 0;
+}
+
+/* KARTE */
+
+.card {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+  perspective: 900px;
+  user-select: none;
+}
+
+.card-inner {
+  position: absolute;
+  inset: 0;
+  transition: transform .5s ease;
+  transform-style: preserve-3d;
+}
+
+.card.flipped .card-inner,
+.card.matched .card-inner {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+
+  box-shadow: 0 5px 14px rgba(0,0,0,.12);
+}
+
+.card-back {
+  background: var(--green);
+  color: white;
+  font-weight: 900;
+  letter-spacing: 1px;
+  font-size: clamp(12px, 3vw, 18px);
+}
+
+.card-front {
+  background: white;
+  transform: rotateY(180deg);
+  flex-direction: column;
+}
+
+.animal {
+  font-size: clamp(34px, 10vw, 64px);
+  line-height: 1;
+}
+
+.animal-name {
+  margin-top: 6px;
+  font-size: clamp(11px, 3vw, 17px);
+  font-weight: 800;
+}
+
+.card.matched .card-front {
+  outline: 4px solid #76b985;
+}
+
+.win {
+  display: none;
+  margin: 28px 0 5px;
+  padding: 22px;
+  background: white;
+  border-radius: 25px;
+  box-shadow: 0 5px 18px rgba(0,0,0,.08);
+}
+
+.win.show {
+  display: block;
+}
+
+.win-title {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--green);
+}
+
+.win button {
+  margin-top: 15px;
+  border: 0;
+  border-radius: 30px;
+  padding: 14px 25px;
+  background: var(--green);
+  color: white;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.footer {
+  margin-top: 35px;
+  font-size: 14px;
+  opacity: .7;
+}
+
+/* kleinere Smartphones */
+
+@media (max-width: 420px) {
+
+  .app {
+    width: 96%;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .board {
+    gap: 8px;
+  }
+
+  .card-face {
+    border-radius: 13px;
+  }
+
+  .level {
+    padding: 13px 17px;
+    font-size: 16px;
+  }
+
+  .stat,
+  .restart {
+    min-width: 135px;
+    font-size: 16px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<main class="app">
+
+<h1>MAJALU</h1>
+
+<div class="subtitle">
+🐾 Tier-Memory für kleine Entdecker
+</div>
+
+<div class="levels">
+
+<button class="level" data-pairs="6">
+Leicht · 6 Paare
+</button>
+
+<button class="level active" data-pairs="8">
+Mittel · 8 Paare
+</button>
+
+<button class="level" data-pairs="12">
+Groß · 12 Paare
+</button>
+
+</div>
+
+
+<div class="stats">
+
+<div class="stat">
+🎯 Züge:
+<span id="moves">0</span>
+</div>
+
+<div class="stat">
+⭐ Paare:
+<span id="matches">0</span>/<span id="total">8</span>
+</div>
+
+<div class="stat">
+⏱️ <span id="timer">00:00</span>
+</div>
+
+<button class="restart" id="restart">
+↻ Neu mischen
+</button>
+
+</div>
+
+
+<div id="board" class="board"></div>
+
+
+<div id="win" class="win">
+
+<div class="win-title">
+🎉 Super gemacht!
+</div>
+
+<p>
+Du hast alle Tierpaare gefunden.
+</p>
+
+<div id="result"></div>
+
+<button id="again">
+Noch einmal spielen
+</button>
+
+</div>
+
+
+<div class="footer">
+MAJALU · Tier-Memory
+</div>
+
+</main>
+
+
+<script>
+
+const animals = [
+  ["🐶","Hund"],
+  ["🐱","Katze"],
+  ["🐰","Hase"],
+  ["🦊","Fuchs"],
+  ["🐻","Bär"],
+  ["🐼","Panda"],
+  ["🐨","Koala"],
+  ["🐯","Tiger"],
+  ["🦁","Löwe"],
+  ["🐸","Frosch"],
+  ["🐵","Affe"],
+  ["🐮","Kuh"]
+];
+
+const board = document.getElementById("board");
+const movesEl = document.getElementById("moves");
+const matchesEl = document.getElementById("matches");
+const totalEl = document.getElementById("total");
+const timerEl = document.getElementById("timer");
+const winEl = document.getElementById("win");
+const resultEl = document.getElementById("result");
+
+let pairCount = 8;
+let firstCard = null;
+let secondCard = null;
+let locked = false;
+
+let moves = 0;
+let matches = 0;
+
+let seconds = 0;
+let timerInterval = null;
+let timerStarted = false;
+
+
+/* Mischen */
+
+function shuffle(array) {
+
+  for (let i = array.length - 1; i > 0; i--) {
+
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [array[i], array[j]] =
+    [array[j], array[i]];
+  }
+
+  return array;
+}
+
+
+/* Spiel erzeugen */
+
+function newGame() {
+
+  clearInterval(timerInterval);
+
+  timerInterval = null;
+  timerStarted = false;
+
+  seconds = 0;
+  moves = 0;
+  matches = 0;
+
+  firstCard = null;
+  secondCard = null;
+  locked = false;
+
+  movesEl.textContent = "0";
+  matchesEl.textContent = "0";
+  totalEl.textContent = pairCount;
+  timerEl.textContent = "00:00";
+
+  winEl.classList.remove("show");
+
+  board.innerHTML = "";
+
+  const selected =
+    animals.slice(0, pairCount);
+
+  let deck = [];
+
+  selected.forEach((animal, index) => {
+
+    deck.push({
+      id: index,
+      emoji: animal[0],
+      name: animal[1]
+    });
+
+    deck.push({
+      id: index,
+      emoji: animal[0],
+      name: animal[1]
+    });
+
+  });
+
+  shuffle(deck);
+
+  deck.forEach(animal => {
+
+    const card =
+      document.createElement("div");
+
+    card.className = "card";
+    card.dataset.id = animal.id;
+
+    card.innerHTML = `
+      <div class="card-inner">
+
+        <div class="card-face card-back">
+          MAJALU
+        </div>
+
+        <div class="card-face card-front">
+
+          <div class="animal">
+            ${animal.emoji}
+          </div>
+
+          <div class="animal-name">
+            ${animal.name}
+          </div>
+
+        </div>
+
+      </div>
+    `;
+
+    card.addEventListener(
+      "click",
+      () => flipCard(card)
+    );
+
+    board.appendChild(card);
+
+  });
+
+}
+
+
+/* Karte umdrehen */
+
+function flipCard(card) {
+
+  if (locked) return;
+
+  if (card === firstCard) return;
+
+  if (card.classList.contains("matched"))
+    return;
+
+  startTimer();
+
+  card.classList.add("flipped");
+
+  if (!firstCard) {
+
+    firstCard = card;
+    return;
+
+  }
+
+  secondCard = card;
+  locked = true;
+
+  moves++;
+
+  movesEl.textContent = moves;
+
+  checkCards();
+}
+
+
+/* Karten vergleichen */
+
+function checkCards() {
+
+  const same =
+    firstCard.dataset.id ===
+    secondCard.dataset.id;
+
+  if (same) {
+
+    firstCard.classList.add("matched");
+    secondCard.classList.add("matched");
+
+    matches++;
+
+    matchesEl.textContent = matches;
+
+    resetTurn();
+
+    if (matches === pairCount) {
+
+      clearInterval(timerInterval);
+
+      setTimeout(showWin, 500);
+    }
+
+  } else {
+
+    setTimeout(() => {
+
+      firstCard.classList.remove("flipped");
+      secondCard.classList.remove("flipped");
+
+      resetTurn();
+
+    }, 900);
+
+  }
+
+}
+
+
+/* Zug zurücksetzen */
+
+function resetTurn() {
+
+  firstCard = null;
+  secondCard = null;
+  locked = false;
+
+}
+
+
+/* Timer */
+
+function startTimer() {
+
+  if (timerStarted) return;
+
+  timerStarted = true;
+
+  timerInterval =
+    setInterval(() => {
+
+      seconds++;
+
+      const min =
+        String(
+          Math.floor(seconds / 60)
+        ).padStart(2,"0");
+
+      const sec =
+        String(
+          seconds % 60
+        ).padStart(2,"0");
+
+      timerEl.textContent =
+        min + ":" + sec;
+
+    },1000);
+}
+
+
+/* Gewonnen */
+
+function showWin() {
+
+  resultEl.innerHTML =
+    "🎯 " + moves +
+    " Züge &nbsp; · &nbsp; ⏱️ " +
+    timerEl.textContent;
+
+  winEl.classList.add("show");
+
+  winEl.scrollIntoView({
+    behavior:"smooth",
+    block:"center"
+  });
+
+}
+
+
+/* Schwierigkeitsstufen */
+
+document
+.querySelectorAll(".level")
+.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    function() {
+
+      document
+      .querySelectorAll(".level")
+      .forEach(b =>
+        b.classList.remove("active")
+      );
+
+      this.classList.add("active");
+
+      pairCount =
+        Number(this.dataset.pairs);
+
+      newGame();
+
+    }
+  );
+
+});
+
+
+/* Neustart */
+
+document
+.getElementById("restart")
+.addEventListener(
+  "click",
+  newGame
+);
+
+
+/* Noch einmal */
+
+document
+.getElementById("again")
+.addEventListener(
+  "click",
+  newGame
+);
+
+
+/* Start */
+
+newGame();
+
+</script>
+
+</body>
+</html>

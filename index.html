@@ -3,12 +3,27 @@
 .new-score td:first-child{box-shadow:inset 5px 0 0 #4d965f}
 .medal{font-size:clamp(18px,4vw,25px)}
 .new-note{margin:10px 0 0;font-weight:800;color:#438b59}
+.game-menu{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:24px auto;max-width:650px}
+.game-choice{width:min(290px,90vw);min-height:150px;border:0;border-radius:24px;background:#fff;font-weight:900;font-size:25px;box-shadow:0 7px 20px #0002;cursor:pointer;padding:22px}
+.game-choice .big{display:block;font-size:58px;margin-bottom:7px}
+.back-home{margin:0 0 12px;background:none;border:0;color:#438b59;font-weight:800;font-size:16px;text-decoration:underline;cursor:pointer}
+.hidden{display:none!important}
 footer{margin-top:28px;color:#667}@media(max-width:500px){.board.hard{gap:5px}.hard .face{border-radius:8px}.hard .animal{font-size:26px}.hard .name{font-size:8px}}
-</style></head><body><main class="app"><h1>Luber's</h1><div class="sub">🐾 Tier-Memory für kleine Entdecker</div><div class="controls" id="levels"></div><div class="stats"><div class="pill">🎯 Züge: <span id="moves">0</span></div><div class="pill">⭐ Paare: <span id="pairs"></span></div><div class="pill">⏱️ <span id="time">00:00</span></div><button class="btn" id="shuffle">↻ Neu mischen</button></div><div id="board" class="board"></div><section class="leader"><h2>🏆 Luber's Bestenliste</h2><div class="small">Gemeinsame Online-Bestenliste · Rang nach Zeit, bei Gleichstand nach Zügen.</div><div class="rank-tabs" id="rankTabs"></div><div id="ranking"></div></section><footer>Luber's · Tier-Memory</footer></main><div class="overlay" id="win"><div class="modal"><h2>🎉 Geschafft!</h2><p id="result"></p><b>Dein Alias</b><input id="alias" maxlength="18" placeholder="z. B. Matze"><button class="btn save" id="save">Ergebnis speichern</button></div></div><script>
-const animals=[{name:'Hund',icon:'🐶'},{name:'Katze',icon:'🐱'},{name:'Fuchs',icon:'🦊'},{name:'Löwe',icon:'🦁'},{name:'Elefant',icon:'🐘'},{name:'Giraffe',icon:'🦒'},{name:'Zebra',icon:'🦓'},{name:'Panda',icon:'🐼'},{name:'Affe',icon:'🐵'},{name:'Koala',icon:'🐨'},{name:'Eule',icon:'🦉'},{name:'Pinguin',icon:'🐧'},{name:'Bär',icon:'🐻'},{name:'Hase',icon:'🐰'},{name:'Kuh',icon:'🐮'},{name:'Schwein',icon:'🐷'},{name:'Schaf',icon:'🐑'},{name:'Pferd',icon:'🐴'}],levels=[["Leicht",6],["Mittel",8],["Groß",12],["Schwierig",18]];let count=8,rankCount=8,deck=[],first=null,lock=false,moves=0,found=0,start=null,timer=null,seconds=0,lastSaved=null;const $=s=>document.querySelector(s),fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"),key=()=>`majalu_scores_${count}`;
+</style></head><body><main class="app">
+<section id="home">
+<h1>Luber's Memory</h1><div class="sub">Welches Memory möchtest du spielen?</div>
+<div class="game-menu">
+<button class="game-choice" data-game="animals"><span class="big">🐾</span>Tier-Memory</button>
+<button class="game-choice" data-game="vehicles"><span class="big">🚜</span>Fahrzeug-Memory</button>
+</div>
+</section>
+<section id="gameArea" class="hidden">
+<button class="back-home" id="backHome">← Zur Spieleauswahl</button>
+<h1>Luber's</h1><div class="sub" id="gameSubtitle">🐾 Tier-Memory für kleine Entdecker</div><div class="controls" id="levels"></div><div class="stats"><div class="pill">🎯 Züge: <span id="moves">0</span></div><div class="pill">⭐ Paare: <span id="pairs"></span></div><div class="pill">⏱️ <span id="time">00:00</span></div><button class="btn" id="shuffle">↻ Neu mischen</button></div><div id="board" class="board"></div><section class="leader"><h2 id="leaderTitle">🏆 Luber's Tier-Bestenliste</h2><div class="small">Gemeinsame Online-Bestenliste · Rang nach Zeit, bei Gleichstand nach Zügen.</div><div class="rank-tabs" id="rankTabs"></div><div id="ranking"></div></section></section><footer>Luber's Memory</footer></main><div class="overlay" id="win"><div class="modal"><h2>🎉 Geschafft!</h2><p id="result"></p><b>Dein Alias</b><input id="alias" maxlength="18" placeholder="z. B. Matze"><button class="btn save" id="save">Ergebnis speichern</button></div></div><script>
+const animalSet=[{name:'Hund',icon:'🐶'},{name:'Katze',icon:'🐱'},{name:'Fuchs',icon:'🦊'},{name:'Löwe',icon:'🦁'},{name:'Elefant',icon:'🐘'},{name:'Giraffe',icon:'🦒'},{name:'Zebra',icon:'🦓'},{name:'Panda',icon:'🐼'},{name:'Affe',icon:'🐵'},{name:'Koala',icon:'🐨'},{name:'Eule',icon:'🦉'},{name:'Pinguin',icon:'🐧'},{name:'Bär',icon:'🐻'},{name:'Hase',icon:'🐰'},{name:'Kuh',icon:'🐮'},{name:'Schwein',icon:'🐷'},{name:'Schaf',icon:'🐑'},{name:'Pferd',icon:'🐴'}],vehicleSet=[{name:'Auto',icon:'🚗'},{name:'Traktor',icon:'🚜'},{name:'Feuerwehr',icon:'🚒'},{name:'Krankenwagen',icon:'🚑'},{name:'Polizei',icon:'🚓'},{name:'LKW',icon:'🚚'},{name:'Bus',icon:'🚌'},{name:'Taxi',icon:'🚕'},{name:'Motorrad',icon:'🏍️'},{name:'Fahrrad',icon:'🚲'},{name:'Zug',icon:'🚂'},{name:'Hubschrauber',icon:'🚁'},{name:'Flugzeug',icon:'✈️'},{name:'Schiff',icon:'🚢'},{name:'Bagger',icon:'🚧'},{name:'Rennwagen',icon:'🏎️'},{name:'Roller',icon:'🛵'},{name:'Rakete',icon:'🚀'}],levels=[["Leicht",6],["Mittel",8],["Groß",12],["Schwierig",18]];let gameType='animals',count=8,rankCount=8,deck=[],first=null,lock=false,moves=0,found=0,start=null,timer=null,seconds=0,lastSaved=null;const $=s=>document.querySelector(s),fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"),key=()=>`majalu_scores_${count}`;
 function levelsUI(){$("#levels").innerHTML=levels.map(([n,c])=>`<button class="btn ${c===count?"active":""}" data-c="${c}">${n} · ${c} Paare</button>`).join("");document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{count=+b.dataset.c;rankCount=count;levelsUI();rankTabsUI();game()})}
 function rankTabsUI(){$("#rankTabs").innerHTML=[6,8,12,18].map(c=>`<button class="rank-tab ${c===rankCount?"active":""}" data-rank-c="${c}">${c} Paare</button>`).join("");document.querySelectorAll("[data-rank-c]").forEach(b=>b.onclick=()=>{rankCount=+b.dataset.rankC;rankTabsUI();rank()})}
-function sh(a){for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}function game(){clearInterval(timer);timer=null;start=null;seconds=moves=found=0;first=null;lock=false;$("#moves").textContent=0;$("#time").textContent="00:00";$("#pairs").textContent=`0/${count}`;deck=sh([...animals.slice(0,count),...animals.slice(0,count)]);draw();rank()}
+function sh(a){for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}function game(){clearInterval(timer);timer=null;start=null;seconds=moves=found=0;first=null;lock=false;$("#moves").textContent=0;$("#time").textContent="00:00";$("#pairs").textContent=`0/${count}`;const motifs=gameType==='animals'?animalSet:vehicleSet;deck=sh([...motifs.slice(0,count),...motifs.slice(0,count)]);draw();rank()}
 function draw(){let b=$("#board");b.className="board"+(count===18?" hard":"");b.style.gridTemplateColumns=`repeat(${count===12||count===18?6:4},1fr)`;b.innerHTML=deck.map((a,i)=>`<button class="card" data-i="${i}"><span class="inner"><span class="face back">LUBER\'S</span><span class="face front"><span class="animal">${a.icon}</span><span class="name">${a.name}</span></span></span></button>`).join("");document.querySelectorAll(".card").forEach(c=>c.onclick=()=>flip(c))}
 function flip(c){if(lock||c.classList.contains("open")||c.classList.contains("matched"))return;if(!start){start=Date.now();timer=setInterval(()=>$("#time").textContent=fmt(++seconds),1000)}c.classList.add("open");let i=+c.dataset.i;if(first===null){first={c,i};return}moves++;$("#moves").textContent=moves;let old=first;first=null;if(deck[old.i].name===deck[i].name){c.classList.add("matched");old.c.classList.add("matched");c.classList.remove("open");old.c.classList.remove("open");found++;$("#pairs").textContent=`${found}/${count}`;if(found===count)finish()}else{lock=true;setTimeout(()=>{c.classList.remove("open");old.c.classList.remove("open");lock=false},650)}}
 function finish(){clearInterval(timer);seconds=Math.max(1,Math.round((Date.now()-start)/1000));$("#time").textContent=fmt(seconds);$("#result").innerHTML=`${count} Paare in <b>${fmt(seconds)}</b> mit <b>${moves} Zügen</b>.`;$("#win").classList.add("show");for(let i=0;i<60;i++){let e=document.createElement("span");e.className="confetti";e.textContent=["🎉","⭐","🐾","✨"][i%4];e.style.left=Math.random()*100+"vw";e.style.animationDelay=Math.random()+"s";document.body.appendChild(e);setTimeout(()=>e.remove(),4200)}}
@@ -19,7 +34,7 @@ function esc(s){let d=document.createElement("div");d.textContent=s;return d.inn
 async function rank(){
   $("#ranking").innerHTML="<p>Bestenliste wird geladen…</p>";
   try{
-    const q=`?select=alias,difficulty,seconds,moves,created_at&difficulty=eq.${rankCount}&order=seconds.asc,moves.asc,created_at.asc&limit=10`;
+    const q=`?select=alias,difficulty,seconds,moves,created_at,game_type&difficulty=eq.${rankCount}&game_type=eq.${gameType}&order=seconds.asc,moves.asc,created_at.asc&limit=10`;
     const r=await fetch(API+q,{headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
     if(!r.ok) throw new Error(await r.text());
     const a=await r.json();
@@ -27,7 +42,7 @@ async function rank(){
     let highlighted=false;
     const rows=a.map((x,i)=>{
       const isNew=!highlighted && lastSaved && rankCount===lastSaved.difficulty &&
-        x.alias===lastSaved.alias && x.seconds===lastSaved.seconds && x.moves===lastSaved.moves &&
+        lastSaved.gameType===gameType && x.alias===lastSaved.alias && x.seconds===lastSaved.seconds && x.moves===lastSaved.moves &&
         Math.abs(new Date(x.created_at).getTime()-lastSaved.createdAt)<120000;
       if(isNew) highlighted=true;
       const place=i<3?`<span class="medal">${medals[i]}</span>`:(i+1);
@@ -40,13 +55,24 @@ $("#save").onclick=async()=>{
   const alias=$("#alias").value.trim()||"Gast";
   const btn=$("#save");btn.disabled=true;btn.textContent="Wird gespeichert…";
   try{
-    const r=await fetch(API,{method:"POST",headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({alias,difficulty:count,seconds,moves})});
+    const r=await fetch(API,{method:"POST",headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({alias,difficulty:count,seconds,moves,game_type:gameType})});
     if(!r.ok) throw new Error(await r.text());
-    lastSaved={alias,difficulty:count,seconds,moves,createdAt:Date.now()};
+    lastSaved={alias,difficulty:count,seconds,moves,gameType,createdAt:Date.now()};
     $("#win").classList.remove("show");$("#alias").value="";rankCount=count;rankTabsUI();await rank();
   }catch(e){console.error(e);alert("Das Ergebnis konnte nicht gespeichert werden. Bitte Internetverbindung prüfen.")}
   finally{btn.disabled=false;btn.textContent="Ergebnis speichern"}
 };
 $("#shuffle").onclick=game;
-levelsUI();rankTabsUI();game();
+
+function openGame(type){
+  gameType=type;count=8;rankCount=8;lastSaved=null;
+  $("#home").classList.add("hidden");$("#gameArea").classList.remove("hidden");
+  $("#gameSubtitle").textContent=type==="animals"?"🐾 Tier-Memory für kleine Entdecker":"🚜 Fahrzeug-Memory für kleine Entdecker";
+  $("#leaderTitle").textContent=type==="animals"?"🏆 Luber's Tier-Bestenliste":"🏆 Luber's Fahrzeug-Bestenliste";
+  levelsUI();rankTabsUI();game();window.scrollTo({top:0,behavior:"smooth"});
+}
+document.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>openGame(b.dataset.game));
+$("#backHome").onclick=()=>{clearInterval(timer);$("#gameArea").classList.add("hidden");$("#home").classList.remove("hidden");window.scrollTo({top:0,behavior:"smooth"})};
+levelsUI();rankTabsUI();
+
 </script></body></html>

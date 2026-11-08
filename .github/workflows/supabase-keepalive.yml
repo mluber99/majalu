@@ -1,0 +1,31 @@
+
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: '17 6,14,22 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Supabase scores database
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$SUPABASE_KEY" || {
+            echo "Supabase key missing"
+            exit 1
+          }
+          curl --fail --show-error --silent \
+            --retry 2 \
+            --max-time 20 \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "https://lkolmyscbbdcixrhsiqm.supabase.co/rest/v1/scores?select=id&limit=1"
+          echo ""
+          echo "Supabase database reachable"

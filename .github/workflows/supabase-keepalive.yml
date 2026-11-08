@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Check Supabase scores database
         env:
-          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           test -n "$SUPABASE_KEY" || {
             echo "Supabase key missing"
